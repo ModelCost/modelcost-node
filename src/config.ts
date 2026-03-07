@@ -64,8 +64,7 @@ export class ModelCostConfig {
       syncIntervalMs: options.syncIntervalMs ?? 10000,
       contentPrivacy:
         options.contentPrivacy ??
-        process.env["MODELCOST_CONTENT_PRIVACY"] === "true" ??
-        false,
+        (process.env["MODELCOST_CONTENT_PRIVACY"] === "true" || false),
     };
 
     const parsed = ModelCostInitOptionsSchema.parse(merged);

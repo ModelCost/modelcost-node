@@ -1,55 +1,14 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { ModelCostClient } from "./client.js";
 import type { TrackRequest } from "./models/track.js";
 import type { ModelPricing } from "./models/cost.js";
 
 // ---------------------------------------------------------------------------
-// Pricing table — loaded from sdk/common/model_pricing.json at import time,
-// refreshed at runtime via GET /api/v1/pricing/models.
+// Pricing table — populated at runtime via GET /api/v1/pricing/models.
+// Falls back to a small set of well-known models if server is unreachable.
 // ---------------------------------------------------------------------------
 
-const _PRICING_JSON_PATHS: string[] = (() => {
-  try {
-    const here = dirname(fileURLToPath(import.meta.url));
-    return [
-      resolve(here, "..", "..", "..", "common", "model_pricing.json"), // sdk/node/src -> sdk/common
-      resolve(here, "..", "..", "..", "..", "sdk", "common", "model_pricing.json"), // alternative layout
-    ];
-  } catch {
-    return [];
-  }
-})();
-
 function _loadBundledPricing(): Map<string, ModelPricing> {
-  for (const filePath of _PRICING_JSON_PATHS) {
-    try {
-      const raw = readFileSync(filePath, "utf-8");
-      const data = JSON.parse(raw) as {
-        models?: Record<string, { provider: string; input_cost_per_1k: number; output_cost_per_1k: number }>;
-      };
-      const models = data.models ?? {};
-      const result = new Map<string, ModelPricing>();
-      for (const [name, info] of Object.entries(models)) {
-        result.set(name, {
-          provider: info.provider,
-          model: name,
-          inputCostPer1k: info.input_cost_per_1k,
-          outputCostPer1k: info.output_cost_per_1k,
-        });
-      }
-      if (result.size > 0) {
-        return result;
-      }
-    } catch {
-      // Try next path
-    }
-  }
-  return _hardcodedFallback();
-}
-
-function _hardcodedFallback(): Map<string, ModelPricing> {
+  // Hardcoded fallback pricing — refreshed at runtime via syncPricingFromApi().
   return new Map<string, ModelPricing>([
     ["gpt-4", { provider: "openai", model: "gpt-4", inputCostPer1k: 0.03, outputCostPer1k: 0.06 }],
     ["gpt-4-turbo", { provider: "openai", model: "gpt-4-turbo", inputCostPer1k: 0.01, outputCostPer1k: 0.03 }],
