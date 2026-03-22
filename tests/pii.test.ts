@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { PiiScanner } from "../src/pii.js";
-import type { FullScanResult } from "../src/pii.js";
 
 describe("PiiScanner", () => {
   const scanner = new PiiScanner();
