@@ -3,34 +3,15 @@ import type { TrackRequest } from "./models/track.js";
 import type { ModelPricing } from "./models/cost.js";
 
 // ---------------------------------------------------------------------------
-// Pricing table — populated at runtime via GET /api/v1/pricing/models.
-// Falls back to a small set of well-known models if server is unreachable.
+// Pricing table — starts empty, populated from server API on init.
 // ---------------------------------------------------------------------------
 
-function _loadBundledPricing(): Map<string, ModelPricing> {
-  // Hardcoded fallback pricing — refreshed at runtime via syncPricingFromApi().
-  return new Map<string, ModelPricing>([
-    ["gpt-4", { provider: "openai", model: "gpt-4", inputCostPer1k: 0.03, outputCostPer1k: 0.06 }],
-    ["gpt-4-turbo", { provider: "openai", model: "gpt-4-turbo", inputCostPer1k: 0.01, outputCostPer1k: 0.03 }],
-    ["gpt-4o", { provider: "openai", model: "gpt-4o", inputCostPer1k: 0.005, outputCostPer1k: 0.015 }],
-    ["gpt-4o-mini", { provider: "openai", model: "gpt-4o-mini", inputCostPer1k: 0.00015, outputCostPer1k: 0.0006 }],
-    ["gpt-3.5-turbo", { provider: "openai", model: "gpt-3.5-turbo", inputCostPer1k: 0.0015, outputCostPer1k: 0.002 }],
-    ["claude-opus-4", { provider: "anthropic", model: "claude-opus-4", inputCostPer1k: 0.015, outputCostPer1k: 0.075 }],
-    ["claude-sonnet-4", { provider: "anthropic", model: "claude-sonnet-4", inputCostPer1k: 0.003, outputCostPer1k: 0.015 }],
-    ["claude-haiku-4", { provider: "anthropic", model: "claude-haiku-4", inputCostPer1k: 0.00025, outputCostPer1k: 0.00125 }],
-    ["gemini-1.5-pro", { provider: "google", model: "gemini-1.5-pro", inputCostPer1k: 0.00125, outputCostPer1k: 0.005 }],
-    ["gemini-1.5-flash", { provider: "google", model: "gemini-1.5-flash", inputCostPer1k: 0.000075, outputCostPer1k: 0.0003 }],
-    ["gemini-2.0-flash", { provider: "google", model: "gemini-2.0-flash", inputCostPer1k: 0.0001, outputCostPer1k: 0.0004 }],
-  ]);
-}
-
 /** Mutable internal map; rewritten by syncPricingFromApi. */
-const _modelPricing: Map<string, ModelPricing> = _loadBundledPricing();
+const _modelPricing: Map<string, ModelPricing> = new Map();
 
 /**
  * Known model pricing table (cost per 1,000 tokens in USD).
- * Loaded from sdk/common/model_pricing.json at import time,
- * refreshed at runtime via syncPricingFromApi().
+ * Starts empty, populated from server API on init.
  */
 export const MODEL_PRICING: ReadonlyMap<string, ModelPricing> = _modelPricing;
 

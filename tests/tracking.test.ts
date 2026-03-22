@@ -1,15 +1,28 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { server } from "./setup.js";
 import { ModelCostConfig } from "../src/config.js";
 import { ModelCostClient } from "../src/client.js";
 import { CostTracker, calculateCost, MODEL_PRICING } from "../src/tracking.js";
+import type { ModelPricing } from "../src/models/cost.js";
 
 const TEST_CONFIG = new ModelCostConfig({
   apiKey: "mc_test_tracking_key",
   orgId: "org-tracking-test",
 });
 
+// MODEL_PRICING starts empty; seed it before calculateCost tests.
+function seedPricing() {
+  const mutable = MODEL_PRICING as Map<string, ModelPricing>;
+  mutable.clear();
+  mutable.set("gpt-4", { provider: "openai", model: "gpt-4", inputCostPer1k: 0.03, outputCostPer1k: 0.06 });
+  mutable.set("gpt-4o", { provider: "openai", model: "gpt-4o", inputCostPer1k: 0.005, outputCostPer1k: 0.015 });
+  mutable.set("claude-sonnet-4", { provider: "anthropic", model: "claude-sonnet-4", inputCostPer1k: 0.003, outputCostPer1k: 0.015 });
+  mutable.set("gemini-1.5-flash", { provider: "google", model: "gemini-1.5-flash", inputCostPer1k: 0.000075, outputCostPer1k: 0.0003 });
+}
+
 describe("calculateCost", () => {
+  beforeEach(() => seedPricing());
+
   it("should calculate cost for gpt-4o with 150 input and 50 output tokens", () => {
     const cost = calculateCost("gpt-4o", 150, 50);
     const pricing = MODEL_PRICING.get("gpt-4o")!;

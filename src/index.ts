@@ -2,7 +2,7 @@ import { ModelCostConfig } from "./config.js";
 import type { ModelCostInitOptions } from "./config.js";
 import { ModelCostClient } from "./client.js";
 import { BudgetManager } from "./budget.js";
-import { CostTracker, calculateCost } from "./tracking.js";
+import { CostTracker, calculateCost, syncPricingFromApi } from "./tracking.js";
 import { PiiScanner } from "./pii.js";
 import type { PiiResult } from "./pii.js";
 import { TokenBucketRateLimiter } from "./rate-limiter.js";
@@ -118,7 +118,7 @@ export class ModelCost {
    * Initialize the ModelCost SDK. Must be called before any other method.
    * Subsequent calls will re-initialize (shutting down the previous instance).
    */
-  static init(options: ModelCostInitOptions): void {
+  static async init(options: ModelCostInitOptions): Promise<void> {
     if (ModelCost._instance) {
       // Gracefully shut down existing instance
       ModelCost._instance.costTracker.stopAutoFlush();
@@ -128,6 +128,14 @@ export class ModelCost {
 
     const config = new ModelCostConfig(options);
     const client = new ModelCostClient(config);
+
+    // Synchronous pricing sync before anything uses calculateCost
+    try {
+      await syncPricingFromApi(config.baseUrl, config.apiKey);
+    } catch {
+      console.warn("[ModelCost] Failed to sync pricing on init; cost estimates unavailable until next sync");
+    }
+
     const budgetManager = new BudgetManager(config.syncIntervalMs);
     const costTracker = new CostTracker(config.flushBatchSize);
     const piiScanner = new PiiScanner();
