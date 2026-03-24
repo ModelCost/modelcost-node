@@ -66,6 +66,27 @@ export const handlers = [
     });
   }),
 
+  // POST /api/v1/sessions
+  http.post(`${BASE_URL}/api/v1/sessions`, () => {
+    return HttpResponse.json({
+      id: "sess_server_001",
+      session_id: "test-session-1",
+      status: "active",
+      max_spend_usd: 5.0,
+      max_iterations: 10,
+    });
+  }),
+
+  // POST /api/v1/sessions/:id/calls — returns empty 200
+  http.post(`${BASE_URL}/api/v1/sessions/:id/calls`, () => {
+    return new HttpResponse(null, { status: 200 });
+  }),
+
+  // POST /api/v1/sessions/:id/close — returns empty 200
+  http.post(`${BASE_URL}/api/v1/sessions/:id/close`, () => {
+    return new HttpResponse(null, { status: 200 });
+  }),
+
   // POST /api/v1/governance/scan
   http.post(`${BASE_URL}/api/v1/governance/scan`, async ({ request }) => {
     const body = (await request.json()) as { text?: string };

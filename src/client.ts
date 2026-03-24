@@ -243,7 +243,8 @@ export class ModelCostClient {
         throw err;
       }
 
-      const data: unknown = await response.json();
+      const text = await response.text();
+      const data: unknown = text.length > 0 ? JSON.parse(text) : {};
       this._recordSuccess();
       return data;
     } catch (error) {

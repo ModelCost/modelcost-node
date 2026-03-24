@@ -162,4 +162,43 @@ describe("ModelCostClient", () => {
       client.close();
     });
   });
+
+  describe("session endpoints with empty responses", () => {
+    it("should handle recordSessionCall with empty 200 response", async () => {
+      const client = new ModelCostClient(TEST_CONFIG);
+
+      // Should not throw despite empty response body
+      await expect(
+        client.recordSessionCall("sess_server_001", {
+          apiKey: "mc_test_client_key",
+          callSequence: 1,
+          callType: "llm",
+          inputTokens: 100,
+          outputTokens: 50,
+          cumulativeInputTokens: 100,
+          costUsd: 0.01,
+          cumulativeCostUsd: 0.01,
+          piiDetected: false,
+        }),
+      ).resolves.toBeUndefined();
+
+      client.close();
+    });
+
+    it("should handle closeSession with empty 200 response", async () => {
+      const client = new ModelCostClient(TEST_CONFIG);
+
+      // Should not throw despite empty response body
+      await expect(
+        client.closeSession("sess_server_001", {
+          apiKey: "mc_test_client_key",
+          status: "completed",
+          finalSpendUsd: 0.05,
+          finalIterationCount: 3,
+        }),
+      ).resolves.toBeUndefined();
+
+      client.close();
+    });
+  });
 });
