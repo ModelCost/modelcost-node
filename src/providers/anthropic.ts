@@ -15,6 +15,8 @@ import type { SessionContext } from "../session.js";
 interface AnthropicUsage {
   input_tokens: number;
   output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
 }
 
 interface AnthropicMessageResponse {
@@ -74,6 +76,8 @@ export class AnthropicProvider implements BaseProvider {
     return {
       inputTokens: res.usage?.input_tokens ?? 0,
       outputTokens: res.usage?.output_tokens ?? 0,
+      cacheCreationTokens: res.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: res.usage?.cache_read_input_tokens ?? 0,
     };
   }
 
@@ -208,6 +212,8 @@ export class AnthropicProvider implements BaseProvider {
                 model,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
+                cacheCreationTokens: usage.cacheCreationTokens || undefined,
+                cacheReadTokens: usage.cacheReadTokens || undefined,
                 latencyMs,
                 metadata: {},
               },

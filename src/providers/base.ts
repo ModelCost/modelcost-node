@@ -4,6 +4,8 @@
 export interface ExtractedUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
 }
 
 /**
