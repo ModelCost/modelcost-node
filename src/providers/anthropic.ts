@@ -202,6 +202,8 @@ export class AnthropicProvider implements BaseProvider {
               model,
               usage.inputTokens,
               usage.outputTokens,
+              usage.cacheCreationTokens,
+              usage.cacheReadTokens,
             );
 
             self._costTracker.record(

@@ -45,6 +45,7 @@ export function trackRequestToApi(request: TrackRequest): Record<string, unknown
 /** Schema for the track API response. */
 export const TrackResponseSchema = z.object({
   status: z.literal("ok"),
+  cost: z.number().optional(),
 });
 
 export type TrackResponse = z.infer<typeof TrackResponseSchema>;

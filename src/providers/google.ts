@@ -211,6 +211,8 @@ export class GoogleProvider implements BaseProvider {
               modelName,
               usage.inputTokens,
               usage.outputTokens,
+              usage.cacheCreationTokens,
+              usage.cacheReadTokens,
             );
 
             self._costTracker.record(
