@@ -1,6 +1,6 @@
 {
   "name": "@modelcost/sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ModelCost SDK for Node.js — AI cost protection, budget enforcement, and PII detection",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
