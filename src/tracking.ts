@@ -37,6 +37,8 @@ export async function syncPricingFromApi(
         provider: string;
         input_cost_per_1k: number;
         output_cost_per_1k: number;
+        cache_creation_cost_per_1k?: number;
+        cache_read_cost_per_1k?: number;
       }>;
     };
     const models = data.models ?? [];
@@ -50,6 +52,8 @@ export async function syncPricingFromApi(
         model: entry.model,
         inputCostPer1k: entry.input_cost_per_1k,
         outputCostPer1k: entry.output_cost_per_1k,
+        cacheCreationCostPer1k: entry.cache_creation_cost_per_1k,
+        cacheReadCostPer1k: entry.cache_read_cost_per_1k,
       });
     }
   } catch {
@@ -60,11 +64,16 @@ export async function syncPricingFromApi(
 /**
  * Calculate the cost of an AI call based on token counts and known pricing.
  * Returns 0 if the model is not found in the pricing table.
+ *
+ * When a cache-specific rate is undefined, the input rate is used as fallback.
+ * When a cache-specific rate is explicitly 0, nothing is charged for those tokens.
  */
 export function calculateCost(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  cacheCreationTokens = 0,
+  cacheReadTokens = 0,
 ): number {
   const pricing = MODEL_PRICING.get(model);
   if (!pricing) {
@@ -73,7 +82,16 @@ export function calculateCost(
 
   const inputCost = (inputTokens / 1000) * pricing.inputCostPer1k;
   const outputCost = (outputTokens / 1000) * pricing.outputCostPer1k;
-  return inputCost + outputCost;
+
+  const cacheCreationRate =
+    pricing.cacheCreationCostPer1k ?? pricing.inputCostPer1k;
+  const cacheReadRate =
+    pricing.cacheReadCostPer1k ?? pricing.inputCostPer1k;
+
+  const cacheCreationCost = (cacheCreationTokens / 1000) * cacheCreationRate;
+  const cacheReadCost = (cacheReadTokens / 1000) * cacheReadRate;
+
+  return inputCost + outputCost + cacheCreationCost + cacheReadCost;
 }
 
 /**
@@ -102,6 +120,8 @@ export class CostTracker {
 
   /**
    * Flush all buffered track requests to the API.
+   * Logs a warning when the server-returned cost differs from the local
+   * calculation by more than 1%.
    */
   async flush(client: ModelCostClient): Promise<void> {
     if (this._buffer.length === 0) {
@@ -111,13 +131,38 @@ export class CostTracker {
     const batch = this._buffer.splice(0, this._buffer.length);
 
     const promises = batch.map((request) =>
-      client.track(request).catch((error: unknown) => {
-        console.warn(
-          `[ModelCost] Failed to track request: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }),
+      client
+        .track(request)
+        .then((response) => {
+          if (response.cost != null) {
+            const localCost = calculateCost(
+              request.model,
+              request.inputTokens,
+              request.outputTokens,
+              request.cacheCreationTokens ?? 0,
+              request.cacheReadTokens ?? 0,
+            );
+            if (localCost > 0) {
+              const pctDiff =
+                Math.abs(response.cost - localCost) / localCost;
+              if (pctDiff > 0.01) {
+                console.warn(
+                  `[ModelCost] Cost discrepancy for ${request.model}: ` +
+                    `server=$${response.cost.toFixed(6)} ` +
+                    `local=$${localCost.toFixed(6)} ` +
+                    `(${(pctDiff * 100).toFixed(1)}% diff)`,
+                );
+              }
+            }
+          }
+        })
+        .catch((error: unknown) => {
+          console.warn(
+            `[ModelCost] Failed to track request: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }),
     );
 
     await Promise.allSettled(promises);

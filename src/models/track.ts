@@ -14,6 +14,8 @@ export const TrackRequestSchema = z.object({
   customerId: z.string().optional(),
   inputTokens: z.number().int().min(0),
   outputTokens: z.number().int().min(0),
+  cacheCreationTokens: z.number().int().min(0).optional(),
+  cacheReadTokens: z.number().int().min(0).optional(),
   latencyMs: z.number().int().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -33,6 +35,8 @@ export function trackRequestToApi(request: TrackRequest): Record<string, unknown
     customer_id: request.customerId ?? null,
     input_tokens: request.inputTokens,
     output_tokens: request.outputTokens,
+    cache_creation_tokens: request.cacheCreationTokens ?? null,
+    cache_read_tokens: request.cacheReadTokens ?? null,
     latency_ms: request.latencyMs ?? null,
     metadata: request.metadata ?? null,
   };
@@ -41,6 +45,7 @@ export function trackRequestToApi(request: TrackRequest): Record<string, unknown
 /** Schema for the track API response. */
 export const TrackResponseSchema = z.object({
   status: z.literal("ok"),
+  cost: z.number().optional(),
 });
 
 export type TrackResponse = z.infer<typeof TrackResponseSchema>;

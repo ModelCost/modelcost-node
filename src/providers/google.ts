@@ -16,6 +16,7 @@ interface GoogleUsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
+  cachedContentTokenCount?: number;
 }
 
 interface GoogleGenerateContentResponse {
@@ -76,9 +77,14 @@ export class GoogleProvider implements BaseProvider {
   extractUsage(response: unknown): ExtractedUsage {
     const res = response as GoogleGenerateContentResponse;
     const metadata = res.response?.usageMetadata;
+    const promptTokens = metadata?.promptTokenCount ?? 0;
+    const cached = metadata?.cachedContentTokenCount ?? 0;
+    const regularInput = Math.max(0, promptTokens - cached);
     return {
-      inputTokens: metadata?.promptTokenCount ?? 0,
+      inputTokens: regularInput,
       outputTokens: metadata?.candidatesTokenCount ?? 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: cached,
     };
   }
 
@@ -205,6 +211,8 @@ export class GoogleProvider implements BaseProvider {
               modelName,
               usage.inputTokens,
               usage.outputTokens,
+              usage.cacheCreationTokens,
+              usage.cacheReadTokens,
             );
 
             self._costTracker.record(
@@ -215,6 +223,8 @@ export class GoogleProvider implements BaseProvider {
                 model: modelName,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
+                cacheCreationTokens: usage.cacheCreationTokens || undefined,
+                cacheReadTokens: usage.cacheReadTokens || undefined,
                 latencyMs,
                 metadata: {},
               },

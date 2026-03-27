@@ -13,10 +13,15 @@ import type { SessionContext } from "../session.js";
  * Typings for the subset of the OpenAI client we interact with.
  * We use structural typing so the SDK does not depend on the openai package.
  */
+interface OpenAIPromptTokensDetails {
+  cached_tokens?: number;
+}
+
 interface OpenAIUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens?: number;
+  prompt_tokens_details?: OpenAIPromptTokensDetails;
 }
 
 interface OpenAIChatResponse {
@@ -80,9 +85,14 @@ export class OpenAIProvider implements BaseProvider {
 
   extractUsage(response: unknown): ExtractedUsage {
     const res = response as OpenAIChatResponse;
+    const promptTokens = res.usage?.prompt_tokens ?? 0;
+    const cachedTokens = res.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+    const regularInput = Math.max(0, promptTokens - cachedTokens);
     return {
-      inputTokens: res.usage?.prompt_tokens ?? 0,
+      inputTokens: regularInput,
       outputTokens: res.usage?.completion_tokens ?? 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: cachedTokens,
     };
   }
 
@@ -199,6 +209,8 @@ export class OpenAIProvider implements BaseProvider {
               model,
               usage.inputTokens,
               usage.outputTokens,
+              usage.cacheCreationTokens,
+              usage.cacheReadTokens,
             );
 
             self._costTracker.record(
@@ -209,6 +221,8 @@ export class OpenAIProvider implements BaseProvider {
                 model,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
+                cacheCreationTokens: usage.cacheCreationTokens || undefined,
+                cacheReadTokens: usage.cacheReadTokens || undefined,
                 latencyMs,
                 metadata: {},
               },
