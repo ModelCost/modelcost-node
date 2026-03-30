@@ -226,7 +226,9 @@ export class ModelCostClient {
           error: "unknown",
           message: response.statusText,
         }))) as { error?: string; message?: string };
-        this._recordFailure();
+        if (response.status >= 500) {
+          this._recordFailure();
+        }
 
         const err = new ModelCostApiError(
           errorBody.message ?? `HTTP ${response.status}`,
