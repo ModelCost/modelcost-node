@@ -70,30 +70,11 @@ describe("ModelCostClient", () => {
     client.close();
   });
 
-  it("should scan text for PII violations", async () => {
+  it("must not expose a server-side scanText method (content never transmitted)", () => {
     const client = new ModelCostClient(TEST_CONFIG);
-
-    const result = await client.scanText({
-      orgId: "org-test",
-      text: "My SSN is 123-45-6789",
-    });
-
-    expect(result.isAllowed).toBe(false);
-    expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]!.subtype).toBe("ssn");
-    client.close();
-  });
-
-  it("should scan clean text and return allowed", async () => {
-    const client = new ModelCostClient(TEST_CONFIG);
-
-    const result = await client.scanText({
-      orgId: "org-test",
-      text: "Hello, how are you?",
-    });
-
-    expect(result.isAllowed).toBe(true);
-    expect(result.violations).toHaveLength(0);
+    expect(
+      (client as unknown as Record<string, unknown>)["scanText"],
+    ).toBeUndefined();
     client.close();
   });
 

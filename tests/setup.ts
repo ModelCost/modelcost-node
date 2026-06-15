@@ -87,36 +87,9 @@ export const handlers = [
     return new HttpResponse(null, { status: 200 });
   }),
 
-  // POST /api/v1/governance/scan
-  http.post(`${BASE_URL}/api/v1/governance/scan`, async ({ request }) => {
-    const body = (await request.json()) as { text?: string };
-    const text = body.text ?? "";
-
-    // Simple SSN detection for test purposes
-    const ssnMatch = text.match(/\d{3}-\d{2}-\d{4}/);
-    if (ssnMatch) {
-      return HttpResponse.json({
-        is_allowed: false,
-        action: "block",
-        violations: [
-          {
-            type: "pii",
-            subtype: "ssn",
-            severity: "high",
-            start: ssnMatch.index ?? 0,
-            end: (ssnMatch.index ?? 0) + ssnMatch[0].length,
-          },
-        ],
-        redacted_text: text.replace(/\d{3}-\d{2}-\d{4}/, "[SSN]"),
-      });
-    }
-
-    return HttpResponse.json({
-      is_allowed: true,
-      action: null,
-      violations: [],
-      redacted_text: null,
-    });
+  // POST /api/v1/governance/signals — metadata-only, returns empty 200
+  http.post(`${BASE_URL}/api/v1/governance/signals`, () => {
+    return new HttpResponse(null, { status: 200 });
   }),
 ];
 

@@ -23,13 +23,10 @@ export {
 } from "./budget.js";
 
 export {
-  GovernanceScanRequestSchema,
-  GovernanceScanResponseSchema,
   DetectedViolationSchema,
-  governanceScanRequestToApi,
-  type GovernanceScanRequest,
-  type GovernanceScanResponse,
+  governanceSignalRequestToApi,
   type DetectedViolation,
+  type GovernanceSignalRequest,
 } from "./governance.js";
 
 export { ModelPricingSchema, type ModelPricing } from "./cost.js";

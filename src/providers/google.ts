@@ -1,8 +1,9 @@
 import type { BaseProvider, ExtractedUsage } from "./base.js";
 import type { ModelCostClient } from "../client.js";
 import type { ModelCostConfig } from "../config.js";
-import { BudgetExceededError, PiiDetectedError } from "../errors.js";
+import { BudgetExceededError } from "../errors.js";
 import { BudgetManager } from "../budget.js";
+import { enforceLocalGovernance } from "../governance.js";
 import { CostTracker, calculateCost } from "../tracking.js";
 import { PiiScanner } from "../pii.js";
 import { TokenBucketRateLimiter } from "../rate-limiter.js";
@@ -118,61 +119,13 @@ export class GoogleProvider implements BaseProvider {
             // 1. Rate limit
             await self._rateLimiter.wait();
 
-            // 2. PII scan on string content
-            if (typeof args[0] === "string") {
-              const scanResult = self._piiScanner.scan(args[0]);
-              if (scanResult.detected) {
-                if (self._config.contentPrivacy) {
-                  // Metadata-only mode: full local classification, never send raw content
-                  const fullResult = self._piiScanner.fullScan(args[0]);
-
-                  if (fullResult.detected) {
-                    // Report signals asynchronously (fire-and-forget)
-                    for (const violation of fullResult.violations) {
-                      self._client
-                        .reportSignal({
-                          organizationId: self._config.orgId,
-                          violationType: violation.category,
-                          violationSubtype: violation.type,
-                          severity: violation.severity,
-                          environment: self._config.environment,
-                          actionTaken: "block",
-                          wasAllowed: false,
-                          detectedAt: new Date().toISOString(),
-                          source: "metadata_only",
-                          violationCount: 1,
-                        })
-                        .catch(() => {}); // fire-and-forget
-                    }
-
-                    throw new PiiDetectedError(
-                      "Sensitive content detected and blocked locally (metadata-only mode)",
-                      fullResult.violations.map((v) => ({
-                        type: v.category,
-                        subtype: v.type,
-                        severity: v.severity as "low" | "medium" | "high",
-                        start: v.start,
-                        end: v.end,
-                      })),
-                      self._piiScanner.redact(args[0]),
-                    );
-                  }
-                } else {
-                  // Standard mode: check governance policy server-side
-                  const govResult = await self._client.scanText({
-                    orgId: self._config.orgId,
-                    text: args[0],
-                    environment: self._config.environment,
-                  });
-                  if (!govResult.isAllowed) {
-                    throw new PiiDetectedError(
-                      "PII detected in request and blocked by policy",
-                      govResult.violations,
-                      govResult.redactedText ?? scanResult.redactedText,
-                    );
-                  }
-                }
-              }
+            // 2. PII scan on string content (local-only; content never sent)
+            if (typeof args[0] === "string" && args[0]) {
+              enforceLocalGovernance(args[0], {
+                client: self._client,
+                config: self._config,
+                piiScanner: self._piiScanner,
+              });
             }
 
             // 3. Budget pre-check
@@ -226,7 +179,6 @@ export class GoogleProvider implements BaseProvider {
                 cacheCreationTokens: usage.cacheCreationTokens || undefined,
                 cacheReadTokens: usage.cacheReadTokens || undefined,
                 latencyMs,
-                metadata: {},
               },
               self._client,
             );
