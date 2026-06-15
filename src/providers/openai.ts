@@ -1,8 +1,9 @@
 import type { BaseProvider, ExtractedUsage } from "./base.js";
 import type { ModelCostClient } from "../client.js";
 import type { ModelCostConfig } from "../config.js";
-import { BudgetExceededError, PiiDetectedError } from "../errors.js";
+import { BudgetExceededError } from "../errors.js";
 import { BudgetManager } from "../budget.js";
+import { enforceLocalGovernance } from "../governance.js";
 import { CostTracker, calculateCost } from "../tracking.js";
 import { PiiScanner } from "../pii.js";
 import { TokenBucketRateLimiter } from "../rate-limiter.js";
@@ -111,67 +112,18 @@ export class OpenAIProvider implements BaseProvider {
             // 1. Rate limit check
             await self._rateLimiter.wait();
 
-            // 2. PII / governance scan on messages
+            // 2. PII / governance scan on messages (local-only; content never sent)
             const messages = params["messages"] as
               | Array<{ content?: string }>
               | undefined;
             if (messages) {
               for (const msg of messages) {
-                if (typeof msg.content === "string") {
-                  const scanResult = self._piiScanner.scan(msg.content);
-                  if (scanResult.detected) {
-                    if (self._config.contentPrivacy) {
-                      // Metadata-only mode: full local classification, never send raw content
-                      const fullResult = self._piiScanner.fullScan(msg.content);
-
-                      if (fullResult.detected) {
-                        // Report signals asynchronously (fire-and-forget)
-                        for (const violation of fullResult.violations) {
-                          self._client
-                            .reportSignal({
-                              organizationId: self._config.orgId,
-                              violationType: violation.category,
-                              violationSubtype: violation.type,
-                              severity: violation.severity,
-                              environment: self._config.environment,
-                              actionTaken: "block",
-                              wasAllowed: false,
-                              detectedAt: new Date().toISOString(),
-                              source: "metadata_only",
-                              violationCount: 1,
-                            })
-                            .catch(() => {}); // fire-and-forget
-                        }
-
-                        throw new PiiDetectedError(
-                          "Sensitive content detected and blocked locally (metadata-only mode)",
-                          fullResult.violations.map((v) => ({
-                            type: v.category,
-                            subtype: v.type,
-                            severity: v.severity as "low" | "medium" | "high",
-                            start: v.start,
-                            end: v.end,
-                          })),
-                          self._piiScanner.redact(msg.content),
-                        );
-                      }
-                    } else {
-                      // Standard mode: check governance policy server-side
-                      const govResult = await self._client.scanText({
-                        orgId: self._config.orgId,
-                        text: msg.content,
-                        environment: self._config.environment,
-                      });
-
-                      if (!govResult.isAllowed) {
-                        throw new PiiDetectedError(
-                          "PII detected in request and blocked by policy",
-                          govResult.violations,
-                          govResult.redactedText ?? scanResult.redactedText,
-                        );
-                      }
-                    }
-                  }
+                if (typeof msg.content === "string" && msg.content) {
+                  enforceLocalGovernance(msg.content, {
+                    client: self._client,
+                    config: self._config,
+                    piiScanner: self._piiScanner,
+                  });
                 }
               }
             }
@@ -224,7 +176,6 @@ export class OpenAIProvider implements BaseProvider {
                 cacheCreationTokens: usage.cacheCreationTokens || undefined,
                 cacheReadTokens: usage.cacheReadTokens || undefined,
                 latencyMs,
-                metadata: {},
               },
               self._client,
             );

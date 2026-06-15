@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modelcost.ai/schemas/egress-allowlist.json",
+  "title": "ModelCost SDK egress allowlist",
+  "description": "Single source of truth for every field the hardened SDK is permitted to transmit from a customer environment. Anything not listed here is forbidden by construction (closed DTOs) and by the invariant test. Field names are the on-the-wire JSON keys produced by the sync client (snake_case). Keep this file identical across modelcost-python / -java / -node.",
+  "version": "0.4.0",
+  "forbiddenKeys": [
+    "text", "prompt", "prompts", "messages", "message", "content", "completion",
+    "completions", "input", "inputs", "output_text", "response_text", "embedding",
+    "embeddings", "attachment", "attachments", "tool_args", "tool_result",
+    "function_args", "arguments", "metadata", "redacted_text", "redactedText"
+  ],
+  "endpoints": {
+    "POST /api/v1/track": {
+      "allowedKeys": [
+        "api_key", "timestamp", "provider", "model", "feature", "customer_id",
+        "input_tokens", "output_tokens", "cache_creation_tokens",
+        "cache_read_tokens", "latency_ms"
+      ]
+    },
+    "POST /api/v1/governance/signals": {
+      "allowedKeys": [
+        "organization_id", "violation_type", "violation_subtype", "severity",
+        "environment", "action_taken", "was_allowed", "detected_at", "source",
+        "violation_count"
+      ]
+    },
+    "POST /api/v1/sessions": {
+      "allowedKeys": [
+        "api_key", "session_id", "feature", "user_id", "max_spend_usd",
+        "max_iterations"
+      ]
+    },
+    "POST /api/v1/sessions/{id}/calls": {
+      "allowedKeys": [
+        "api_key", "call_sequence", "call_type", "tool_name", "input_tokens",
+        "output_tokens", "cumulative_input_tokens", "cost_usd",
+        "cumulative_cost_usd", "pii_detected"
+      ]
+    },
+    "POST /api/v1/sessions/{id}/close": {
+      "allowedKeys": [
+        "api_key", "status", "termination_reason", "final_spend_usd",
+        "final_iteration_count"
+      ]
+    }
+  },
+  "removedEndpoints": [
+    "POST /api/v1/governance/scan"
+  ]
+}

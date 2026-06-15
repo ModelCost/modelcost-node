@@ -24,10 +24,6 @@ import {
   BudgetStatusResponseSchema,
 } from "./models/budget.js";
 import {
-  type GovernanceScanRequest,
-  type GovernanceScanResponse,
-  GovernanceScanResponseSchema,
-  governanceScanRequestToApi,
   type GovernanceSignalRequest,
   governanceSignalRequestToApi,
 } from "./models/governance.js";
@@ -84,17 +80,6 @@ export class ModelCostClient {
     });
     const data = await this._post(`/api/v1/budgets/check?${params.toString()}`, {});
     return BudgetCheckResponseSchema.parse(data);
-  }
-
-  /**
-   * Scan text for PII and governance violations.
-   */
-  async scanText(
-    request: GovernanceScanRequest,
-  ): Promise<GovernanceScanResponse> {
-    const body = governanceScanRequestToApi(request);
-    const data = await this._post("/api/v1/governance/scan", body);
-    return GovernanceScanResponseSchema.parse(data);
   }
 
   /**
@@ -291,14 +276,6 @@ export class ModelCostClient {
         total_budget_usd: 0,
         total_spend_usd: 0,
         policies_at_risk: 0,
-      };
-    }
-    if (path.includes("/governance/scan")) {
-      return {
-        is_allowed: true,
-        action: null,
-        violations: [],
-        redacted_text: null,
       };
     }
     if (path.includes("/sessions")) {

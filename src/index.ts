@@ -8,6 +8,7 @@ import type { PiiResult } from "./pii.js";
 import { TokenBucketRateLimiter } from "./rate-limiter.js";
 import { createProviderForClient } from "./providers/index.js";
 import { ConfigurationError } from "./errors.js";
+import { opaqueRef } from "./identifiers.js";
 import { SessionContext } from "./session.js";
 import type { BudgetCheckResponse, BudgetStatusResponse } from "./models/budget.js";
 
@@ -47,8 +48,6 @@ export type {
   BudgetCheckResponse,
   BudgetPolicy,
   BudgetStatusResponse,
-  GovernanceScanRequest,
-  GovernanceScanResponse,
   DetectedViolation,
   ModelPricing,
   CreateSessionRequest,
@@ -119,6 +118,14 @@ export class ModelCost {
    * Subsequent calls will re-initialize (shutting down the previous instance).
    */
   static async init(options: ModelCostInitOptions): Promise<void> {
+    if ((options as Record<string, unknown>)["contentPrivacy"] !== undefined) {
+      // Removed in 0.5.0: content is NEVER transmitted, so the flag is obsolete and
+      // could mislead. Hard-error rather than silently ignore.
+      throw new ConfigurationError(
+        "contentPrivacy was removed in modelcost-node 0.5.0: prompt/response content is " +
+          "never transmitted to ModelCost by any code path. Remove this option.",
+      );
+    }
     if (ModelCost._instance) {
       // Gracefully shut down existing instance
       ModelCost._instance.costTracker.stopAutoFlush();
@@ -191,6 +198,11 @@ export class ModelCost {
   ): <TFn extends (...args: unknown[]) => unknown>(fn: TFn) => TFn {
     const inst = ModelCost._requireInstance();
 
+    // feature is a label, never PII — validate (don't pseudonymize, keep readable).
+    const safeFeature =
+      opaqueRef(options.feature, { field: "feature", pseudonymize: false }) ??
+      undefined;
+
     return <TFn extends (...args: unknown[]) => unknown>(fn: TFn): TFn => {
       const wrapped = async (...args: unknown[]): Promise<unknown> => {
         // Session pre-check
@@ -210,11 +222,10 @@ export class ModelCost {
             timestamp: new Date().toISOString(),
             provider: (options.provider ?? "openai") as "openai",
             model: options.model,
-            feature: options.feature,
+            feature: safeFeature,
             inputTokens: 0,
             outputTokens: 0,
             latencyMs,
-            metadata: {},
           },
           inst.client,
         );
@@ -281,13 +292,24 @@ export class ModelCost {
     const inst = ModelCost._requireInstance();
     const sessionId = options.sessionId ?? crypto.randomUUID();
 
+    // feature is a label (validate, keep readable); userId is an entity ref that must
+    // leave as an opaque token (HMAC-pseudonymized when a secret is configured).
+    const safeFeature =
+      opaqueRef(options.feature, { field: "feature", pseudonymize: false }) ??
+      undefined;
+    const userRef =
+      opaqueRef(options.userId, {
+        secret: inst.config.identifierSecret,
+        field: "userId",
+      }) ?? undefined;
+
     let serverSessionId: string | undefined;
     try {
       const response = await inst.client.createSession({
         apiKey: inst.config.apiKey,
         sessionId,
-        feature: options.feature,
-        userId: options.userId,
+        feature: safeFeature,
+        userId: userRef,
         maxSpendUsd: options.maxSpendUsd,
         maxIterations: options.maxIterations,
       });
@@ -299,8 +321,8 @@ export class ModelCost {
     return new SessionContext({
       sessionId,
       serverSessionId,
-      feature: options.feature,
-      userId: options.userId,
+      feature: safeFeature,
+      userId: userRef,
       maxSpendUsd: options.maxSpendUsd,
       maxIterations: options.maxIterations,
     });

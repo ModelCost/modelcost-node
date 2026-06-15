@@ -19,7 +19,9 @@ export const ModelCostInitOptionsSchema = z.object({
   flushIntervalMs: z.number().int().positive().default(5000),
   flushBatchSize: z.number().int().positive().default(100),
   syncIntervalMs: z.number().int().positive().default(10000),
-  contentPrivacy: z.boolean().default(false),
+  // Optional customer-held secret used ONLY locally to pseudonymize identifier refs
+  // (customerId / userId) via HMAC. Never transmitted to ModelCost.
+  identifierSecret: z.string().min(1).optional(),
 });
 
 export type ModelCostInitOptions = z.input<typeof ModelCostInitOptionsSchema>;
@@ -44,7 +46,7 @@ export class ModelCostConfig {
   public readonly flushIntervalMs: number;
   public readonly flushBatchSize: number;
   public readonly syncIntervalMs: number;
-  public readonly contentPrivacy: boolean;
+  public readonly identifierSecret: string | undefined;
 
   constructor(options: ModelCostInitOptions) {
     const merged = {
@@ -62,9 +64,8 @@ export class ModelCostConfig {
       flushIntervalMs: options.flushIntervalMs ?? 5000,
       flushBatchSize: options.flushBatchSize ?? 100,
       syncIntervalMs: options.syncIntervalMs ?? 10000,
-      contentPrivacy:
-        options.contentPrivacy ??
-        (process.env["MODELCOST_CONTENT_PRIVACY"] === "true" || false),
+      identifierSecret:
+        options.identifierSecret ?? process.env["MODELCOST_IDENTIFIER_SECRET"],
     };
 
     const parsed = ModelCostInitOptionsSchema.parse(merged);
@@ -79,6 +80,6 @@ export class ModelCostConfig {
     this.flushIntervalMs = parsed.flushIntervalMs;
     this.flushBatchSize = parsed.flushBatchSize;
     this.syncIntervalMs = parsed.syncIntervalMs;
-    this.contentPrivacy = parsed.contentPrivacy;
+    this.identifierSecret = parsed.identifierSecret;
   }
 }
